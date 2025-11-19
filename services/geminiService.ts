@@ -1,10 +1,10 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { TideData, TideEvent } from "../types";
 import { generateTideCurve, calculateCurrentHeight } from "../utils/tideMath";
 
 // Fallback mock data for development or quota limits
 const MOCK_TIDE_DATA: Omit<TideData, 'chartData'> = {
+  requestedName: "Navia",
   locationName: "Navia (Simulado)",
   coordinates: { lat: 43.54, lng: -6.72 },
   date: new Date().toLocaleDateString('es-ES'),
@@ -26,21 +26,30 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
   if (!apiKey) {
     console.warn("No API Key provided. Using mock data.");
     const chartData = generateTideCurve(MOCK_TIDE_DATA.tides);
-    return { ...MOCK_TIDE_DATA, chartData };
+    return { ...MOCK_TIDE_DATA, requestedName: locationQuery, chartData };
   }
 
   const ai = new GoogleGenAI({ apiKey });
 
   try {
     // Step 1: Use Google Search to find the raw data
-    // We ask for specific data points to ensure the model searches for them.
+    // Modified prompt to explicitly ask for reliable sources
     const searchPrompt = `
-      Busca la tabla de mareas completa para hoy en ${locationQuery}. 
-      Necesito saber:
-      1. Horas y alturas de todas las pleamares y bajamares de hoy.
+      Busca la tabla de mareas oficial y precisa para hoy en "${locationQuery}".
+      
+      FUENTES PRIORITARIAS:
+      1. Instituto Hidrográfico de la Marina (IHM) / Armada Española.
+      2. Puertos del Estado (gob.es).
+      3. Tablademareas.com (basado en IHM).
+      
+      CRÍTICO: Si "${locationQuery}" es una ciudad de interior o una ubicación sin estación propia, BUSCA Y USA los datos del PUERTO PRINCIPAL O ESTACIÓN DE MAREAS MÁS CERCANA.
+      
+      Necesito extraer:
+      1. Horas y alturas EXACTAS de todas las pleamares y bajamares de hoy.
       2. El coeficiente de marea de hoy.
       3. Hora de salida y puesta del sol hoy.
-      4. Las coordenadas geográficas (latitud y longitud) aproximadas de este punto de costa.
+      4. Coordenadas geográficas aproximadas del punto de costa utilizado.
+      5. El nombre real del puerto o playa del que provienen los datos.
     `;
 
     const searchResponse = await ai.models.generateContent({
@@ -54,16 +63,17 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
     const rawText = searchResponse.text;
 
     // Step 2: Extract structured data from the search result
-    // We pass the raw text and ask for a strict JSON format.
     const extractionPrompt = `
       Act as a data extraction engine. Based ONLY on the following text, extract the tide and sun information for today.
       
       Text to analyze:
       ${rawText}
       
+      IMPORTANT: If the text indicates the data is from a nearby port (e.g. user asked for "Oviedo" but data is from "Gijón"), use that port's name as 'locationName'.
+      
       Return a JSON object with this schema:
       {
-        "locationName": "string (City Name)",
+        "locationName": "string (Name of the actual coastal station/port found)",
         "latitude": number,
         "longitude": number,
         "date": "string (DD/MM/YYYY)",
@@ -117,17 +127,17 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
     // Validate and Process
     const tides: TideEvent[] = parsedData.tides || [];
     
-    // If API returns minimal data or fails to parse tides properly, throw fallback
     if (tides.length === 0) throw new Error("No tide data found");
 
     const { height: currentHeight, isRising } = calculateCurrentHeight(tides);
     const chartData = generateTideCurve(tides);
 
     return {
+      requestedName: locationQuery,
       locationName: parsedData.locationName || locationQuery,
       coordinates: (parsedData.latitude && parsedData.longitude) ? { lat: parsedData.latitude, lng: parsedData.longitude } : undefined,
       date: parsedData.date || new Date().toLocaleDateString('es-ES'),
-      coefficient: parsedData.coefficient || 70, // Default if missing
+      coefficient: parsedData.coefficient || 70,
       sun: {
         sunrise: parsedData.sunrise || "07:00",
         sunset: parsedData.sunset || "20:00"
@@ -140,8 +150,7 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
 
   } catch (error) {
     console.error("Error fetching tide data:", error);
-    // Fallback to mock data in case of error (better than empty screen)
     const chartData = generateTideCurve(MOCK_TIDE_DATA.tides as TideEvent[]);
-    return { ...MOCK_TIDE_DATA, locationName: `${locationQuery} (Offline/Simulado)`, chartData } as TideData;
+    return { ...MOCK_TIDE_DATA, requestedName: locationQuery, locationName: `${locationQuery} (Offline/Simulado)`, chartData } as TideData;
   }
 };

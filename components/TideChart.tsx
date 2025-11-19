@@ -1,24 +1,22 @@
 import React, { useState, useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot, Label } from 'recharts';
 import { TideData } from '../types';
-import { Sailboat } from 'lucide-react';
+import { Sailboat, Sun, Moon } from 'lucide-react';
 import { timeToDecimal, decimalToTime } from '../utils/tideMath';
 
 interface TideChartProps {
   data: TideData;
 }
 
-// RGB Color definitions for the sky states
+// Updated RGB Color definitions for a vibrant horizon glow
 const COLORS = {
-  NIGHT: [2, 4, 10],      // #02040a (Rich Black/Blue)
-  BLUE: [30, 58, 138],    // #1e3a8a (Blue-900)
-  GOLD: [234, 88, 12],    // #ea580c (Orange-600)
-  DAY: [12, 74, 110],     // #0c4a6e (Sky-900)
+  NIGHT: [2, 4, 10],       // #02040a (Deep Dark)
+  BLUE: [30, 64, 175],     // #1e40af (Blue-800 - Deep Blue Hour)
+  GOLD: [249, 115, 22],    // #f97316 (Orange-500 - Golden Hour/Sunset)
+  DAY: [14, 165, 233],     // #0ea5e9 (Sky-500 - Daylight Blue)
 };
 
-/**
- * Interpolates between two RGB arrays based on a factor (0 to 1)
- */
+// Helper: Interpolate between two RGB arrays
 const interpolateColor = (c1: number[], c2: number[], factor: number) => {
   const f = Math.max(0, Math.min(1, factor));
   const r = Math.round(c1[0] + (c2[0] - c1[0]) * f);
@@ -27,54 +25,37 @@ const interpolateColor = (c1: number[], c2: number[], factor: number) => {
   return `rgb(${r}, ${g}, ${b})`;
 };
 
-/**
- * Calculates the sky color for a given time of day
- */
+// Helper: Calculate horizon color based on time
 const getSkyColor = (time: number, sunrise: number, sunset: number): string => {
-  // Normalize time to 0-24
   let t = time;
   while (t < 0) t += 24;
   while (t >= 24) t -= 24;
 
   const { NIGHT, BLUE, GOLD, DAY } = COLORS;
 
-  // --- MORNING TRANSITIONS ---
-  // Night until Sunrise - 1h
-  if (t < sunrise - 1) return `rgb(${NIGHT.join(',')})`;
+  // --- MORNING ---
+  // Night -> Blue (starts 1.5h before sunrise)
+  if (t < sunrise - 1.5) return `rgb(${NIGHT.join(',')})`;
+  if (t < sunrise - 0.5) return interpolateColor(NIGHT, BLUE, (t - (sunrise - 1.5)) / 1);
   
-  // Night -> Blue (30m duration)
-  if (t < sunrise - 0.5) {
-    return interpolateColor(NIGHT, BLUE, (t - (sunrise - 1)) / 0.5);
-  }
+  // Blue -> Gold (starts 30m before sunrise)
+  if (t < sunrise) return interpolateColor(BLUE, GOLD, (t - (sunrise - 0.5)) / 0.5);
   
-  // Blue -> Gold (30m duration, ends at sunrise)
-  if (t < sunrise) {
-    return interpolateColor(BLUE, GOLD, (t - (sunrise - 0.5)) / 0.5);
-  }
-  
-  // Gold -> Day (1h duration, ends 1h after sunrise)
-  if (t < sunrise + 1) {
-    return interpolateColor(GOLD, DAY, (t - sunrise) / 1);
-  }
+  // Gold -> Day (starts at sunrise, lasts 1h)
+  if (t < sunrise + 1) return interpolateColor(GOLD, DAY, (t - sunrise) / 1);
   
   // --- DAY ---
   if (t < sunset - 1) return `rgb(${DAY.join(',')})`;
 
-  // --- EVENING TRANSITIONS ---
-  // Day -> Gold (1h duration, starts 1h before sunset)
-  if (t < sunset) {
-    return interpolateColor(DAY, GOLD, (t - (sunset - 1)) / 1);
-  }
+  // --- EVENING ---
+  // Day -> Gold (starts 1h before sunset)
+  if (t < sunset) return interpolateColor(DAY, GOLD, (t - (sunset - 1)) / 1);
   
-  // Gold -> Blue (30m duration, starts at sunset)
-  if (t < sunset + 0.5) {
-    return interpolateColor(GOLD, BLUE, (t - sunset) / 0.5);
-  }
+  // Gold -> Blue (starts at sunset, lasts 45m)
+  if (t < sunset + 0.75) return interpolateColor(GOLD, BLUE, (t - sunset) / 0.75);
   
-  // Blue -> Night (1h duration, starts 30m after sunset)
-  if (t < sunset + 1.5) {
-    return interpolateColor(BLUE, NIGHT, (t - (sunset + 0.5)) / 1);
-  }
+  // Blue -> Night (starts 45m after sunset, lasts 1h)
+  if (t < sunset + 1.75) return interpolateColor(BLUE, NIGHT, (t - (sunset + 0.75)) / 1);
 
   // Night
   return `rgb(${NIGHT.join(',')})`;
@@ -84,19 +65,20 @@ export const TideChart: React.FC<TideChartProps> = ({ data }) => {
   const currentTime = new Date();
   const currentDecimal = currentTime.getHours() + currentTime.getMinutes() / 60;
   
-  // Initialize hover time to current time
   const [hoverTime, setHoverTime] = useState(currentDecimal);
   
-  // Calculate decimals for sun events
   const sunriseDecimal = timeToDecimal(data.sun.sunrise);
   const sunsetDecimal = timeToDecimal(data.sun.sunset);
 
-  // Calculate dynamic background color
-  const backgroundColor = useMemo(() => 
+  // Calculate the dynamic horizon color
+  const horizonColor = useMemo(() => 
     getSkyColor(hoverTime, sunriseDecimal, sunsetDecimal),
   [hoverTime, sunriseDecimal, sunsetDecimal]);
 
-  // Determine next High and Low tides relative to now for the horizontal lines
+  // Determine celestial icon
+  const isDay = hoverTime > sunriseDecimal && hoverTime < sunsetDecimal;
+
+  // Find next tides
   const nextHigh = data.tides
     .filter(t => t.type === 'HIGH' && timeToDecimal(t.time) > currentDecimal)
     .sort((a, b) => timeToDecimal(a.time) - timeToDecimal(b.time))[0] 
@@ -119,9 +101,20 @@ export const TideChart: React.FC<TideChartProps> = ({ data }) => {
 
   return (
     <div 
-      className="w-full h-64 md:h-80 relative transition-colors duration-150 ease-out"
-      style={{ backgroundColor }}
+      className="w-full h-64 md:h-80 relative overflow-hidden"
+      style={{ 
+        background: `linear-gradient(to top, ${horizonColor} 0%, #02040a 60%)`
+      }}
     >
+      {/* Celestial Body Decoration */}
+      <div className="absolute top-4 right-4 transition-opacity duration-1000 opacity-80 pointer-events-none">
+        {isDay ? (
+          <Sun className="text-yellow-400 animate-pulse" size={24} />
+        ) : (
+          <Moon className="text-blue-200" size={24} />
+        )}
+      </div>
+
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
           data={data.chartData}
@@ -166,38 +159,30 @@ export const TideChart: React.FC<TideChartProps> = ({ data }) => {
             formatter={(value: number) => [`${value}m`, 'Altura']}
           />
 
-          {/* === VERTICAL BARS === */}
-          
-          {/* Sunrise */}
+          {/* Reference lines for Sun/Time */}
           <ReferenceLine x={sunriseDecimal} stroke="#FACC15" strokeDasharray="3 3" strokeWidth={2}>
             <Label value="Salida" position="insideTopLeft" fill="#FACC15" fontSize={10} offset={10} className="hidden sm:block" />
           </ReferenceLine>
           
-          {/* Sunset */}
           <ReferenceLine x={sunsetDecimal} stroke="#A855F7" strokeDasharray="3 3" strokeWidth={2}>
              <Label value="Puesta" position="insideTopRight" fill="#A855F7" fontSize={10} offset={10} className="hidden sm:block" />
           </ReferenceLine>
           
-          {/* Current Time */}
           <ReferenceLine x={currentDecimal} stroke="#FFFFFF" strokeWidth={2} />
 
-          {/* === HORIZONTAL BARS === */}
-          
-          {/* Next High Tide Level */}
+          {/* Tide Heights */}
           {nextHigh && (
             <ReferenceLine y={nextHigh.height} stroke="#22C55E" strokeDasharray="5 5" strokeOpacity={0.7}>
               <Label value={`Pleamar ${nextHigh.height}m`} position="insideRight" fill="#22C55E" fontSize={10} dy={-10} />
             </ReferenceLine>
           )}
 
-          {/* Next Low Tide Level */}
           {nextLow && (
             <ReferenceLine y={nextLow.height} stroke="#EF4444" strokeDasharray="5 5" strokeOpacity={0.7}>
               <Label value={`Bajamar ${nextLow.height}m`} position="insideRight" fill="#EF4444" fontSize={10} dy={10} />
             </ReferenceLine>
           )}
           
-          {/* Current Height Level */}
           <ReferenceLine y={data.currentHeight} stroke="white" strokeDasharray="2 4" strokeOpacity={0.5} />
 
           <Area
@@ -209,7 +194,6 @@ export const TideChart: React.FC<TideChartProps> = ({ data }) => {
             animationDuration={1500}
           />
           
-          {/* Boat Icon at Current Time */}
           <ReferenceDot 
             x={currentDecimal} 
             y={data.currentHeight} 
@@ -219,7 +203,6 @@ export const TideChart: React.FC<TideChartProps> = ({ data }) => {
         </AreaChart>
       </ResponsiveContainer>
       
-      {/* Legend Overlay */}
       <div className="absolute top-2 right-2 flex flex-col items-end gap-1 text-[10px] text-gray-400 pointer-events-none opacity-80">
         <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-400"></span> Sol</div>
         <div className="flex items-center gap-1"><span className="w-2 h-0.5 bg-white"></span> Ahora</div>

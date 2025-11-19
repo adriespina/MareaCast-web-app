@@ -11,6 +11,7 @@ export interface SunCycle {
 }
 
 export interface TideData {
+  requestedName?: string;
   locationName: string;
   coordinates?: { lat: number; lng: number };
   date: string;
