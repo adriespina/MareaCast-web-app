@@ -2,19 +2,66 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run and deploy your AI Studio app
+# MareaCast - Aplicación de Predicción de Mareas
 
-This contains everything you need to run your app locally.
+Aplicación web para consultar predicciones de mareas usando APIs públicas y bases de datos abiertas.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1kKZlIDaRyLVIFklBub99RNls_clueKvu
+## Características
 
-## Run Locally
+- 🌊 Predicciones de mareas en tiempo real
+- 📍 Búsqueda por nombre de lugar o coordenadas
+- 🗺️ Visualización en mapa
+- 📊 Gráficos interactivos de nivel del mar
+- ☀️ Horarios de salida y puesta del sol
+- 🌍 Funciona globalmente sin necesidad de API keys (opcional para mayor precisión)
 
-**Prerequisites:**  Node.js
+## APIs Utilizadas
 
+La aplicación utiliza las siguientes APIs públicas y gratuitas:
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- **Nominatim (OpenStreetMap)**: Geocodificación gratuita para convertir nombres de lugares a coordenadas
+- **Sunrise-Sunset API**: Datos de salida y puesta del sol
+- **WorldTides API** (opcional): Predicciones precisas de mareas (requiere API key gratuita)
+- **Cálculo astronómico**: Fallback con fórmulas de marea cuando no hay API key disponible
+
+## Instalación y Uso
+
+**Prerrequisitos:** Node.js
+
+1. Instalar dependencias:
+   ```bash
+   npm install
+   ```
+
+2. (Opcional) Configurar variables de entorno en `.env.local`:
+   ```
+   WORLDTIDES_API_KEY=tu_api_key_aqui
+   ```
+   > Nota: Puedes obtener una API key gratuita en [WorldTides.info](https://www.worldtides.info/apidocs) (1000 requests/mes gratis)
+
+3. Ejecutar la aplicación:
+   ```bash
+   npm run dev
+   ```
+
+4. Construir para producción:
+   ```bash
+   npm run build
+   ```
+
+## Despliegue en Vercel
+
+La aplicación está configurada para desplegarse automáticamente en Vercel:
+
+1. Conecta tu repositorio a Vercel
+2. (Opcional) Agrega `WORLDTIDES_API_KEY` en las variables de entorno de Vercel
+3. Vercel detectará automáticamente la configuración y desplegará la app
+
+## Tecnologías
+
+- React 19
+- TypeScript
+- Vite
+- Tailwind CSS
+- Recharts (gráficos)
+- APIs públicas de datos abiertos

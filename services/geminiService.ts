@@ -21,7 +21,7 @@ const MOCK_TIDE_DATA: Omit<TideData, 'chartData'> = {
 };
 
 export const fetchTideData = async (locationQuery: string): Promise<TideData> => {
-  const apiKey = process.env.API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   
   if (!apiKey) {
     console.warn("No API Key provided. Using mock data.");

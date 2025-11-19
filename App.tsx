@@ -4,7 +4,7 @@ import { InfoPanel } from './components/InfoPanel';
 import { TideChart } from './components/TideChart';
 import { TideList } from './components/TideList';
 import { MapView } from './components/MapView';
-import { fetchTideData } from './services/geminiService';
+import { fetchTideData } from './services/tideApiService';
 import { TideData } from './types';
 
 const App: React.FC = () => {
@@ -25,6 +25,14 @@ const App: React.FC = () => {
       setData(tideData);
     } catch (error) {
       console.error("Failed to load data", error);
+      // Asegurar que siempre tenemos datos, incluso si falla
+      // fetchTideData siempre retorna datos (mock si falla), pero por si acaso:
+      try {
+        const fallbackData = await fetchTideData("Vigo");
+        setData(fallbackData);
+      } catch (fallbackError) {
+        console.error("Fallback also failed", fallbackError);
+      }
     } finally {
       setLoading(false);
     }
@@ -88,7 +96,22 @@ const App: React.FC = () => {
     }
   };
 
-  if (!data && !loading) return <div className="min-h-screen bg-black text-white flex items-center justify-center">Error cargando datos.</div>;
+  // Mostrar error solo si realmente falló después de intentar cargar
+  if (!data && !loading) {
+    return (
+      <div className="min-h-screen bg-ocean-900 text-white flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-xl mb-4">Error cargando datos</p>
+          <button 
+            onClick={() => loadData(location)} 
+            className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded"
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div 
@@ -175,7 +198,7 @@ const App: React.FC = () => {
 
       {/* Footer */}
       <footer className="p-4 text-center text-xs text-ocean-400">
-        <p>MareaCast © {new Date().getFullYear()} • Datos generados por IA (Gemini 2.5 Flash)</p>
+        <p>MareaCast © {new Date().getFullYear()} • Datos de APIs públicas y bases de datos abiertas</p>
       </footer>
     </div>
   );
