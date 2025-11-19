@@ -1,0 +1,7 @@
+{
+  "name": "MareaCast",
+  "description": "Visualización de mareas en tiempo real, coeficientes y estado del mar para tu ubicación más cercana.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
