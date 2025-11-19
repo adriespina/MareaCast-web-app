@@ -198,7 +198,7 @@ const App: React.FC = () => {
 
       {/* Footer */}
       <footer className="p-4 text-center text-xs text-ocean-400">
-        <p>MareaCast © {new Date().getFullYear()} • Datos de APIs públicas y bases de datos abiertas</p>
+        <p>MareaCast © {new Date().getFullYear()} • Datos del Instituto Hidrográfico de la Marina (IHM) y fuentes oficiales españolas</p>
       </footer>
     </div>
   );

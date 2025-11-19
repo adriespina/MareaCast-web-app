@@ -15,14 +15,28 @@ Aplicación web para consultar predicciones de mareas usando APIs públicas y ba
 - ☀️ Horarios de salida y puesta del sol
 - 🌍 Funciona globalmente sin necesidad de API keys (opcional para mayor precisión)
 
-## APIs Utilizadas
+## APIs y Fuentes de Datos Utilizadas
 
-La aplicación utiliza las siguientes APIs públicas y gratuitas:
+La aplicación utiliza las siguientes fuentes de datos, priorizando fuentes oficiales españolas:
 
+### Fuentes Oficiales Españolas (Prioridad Alta)
+- **Tablademareas.com**: Datos oficiales del Instituto Hidrográfico de la Marina (IHM)
+  - Acceso mediante scraping con proxy CORS
+  - Cubre los principales puertos españoles
+  - Datos basados en el Anuario de Mareas del IHM
+
+- **Mapeo de Puertos IHM**: Base de datos de puertos oficiales del IHM
+  - Mapeo automático de ciudades a puertos más cercanos
+  - Incluye más de 30 puertos españoles principales
+
+### APIs Públicas Internacionales
 - **Nominatim (OpenStreetMap)**: Geocodificación gratuita para convertir nombres de lugares a coordenadas
 - **Sunrise-Sunset API**: Datos de salida y puesta del sol
 - **WorldTides API** (opcional): Predicciones precisas de mareas (requiere API key gratuita)
-- **Cálculo astronómico**: Fallback con fórmulas de marea cuando no hay API key disponible
+  - Se usa como fallback si no hay datos disponibles de fuentes españolas
+
+### Fallback
+- **Cálculo astronómico**: Fórmulas de marea cuando no hay datos de APIs disponibles
 
 ## Instalación y Uso
 

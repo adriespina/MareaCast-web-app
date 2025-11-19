@@ -137,6 +137,197 @@ async function getSunTimes(lat: number, lng: number): Promise<{ sunrise: string;
 }
 
 /**
+ * Mapeo de ciudades españolas a puertos IHM más cercanos
+ * Basado en el Anuario de Mareas del IHM
+ */
+const SPANISH_PORT_MAPPING: { [key: string]: { name: string; lat: number; lng: number; code?: string } } = {
+  'vigo': { name: 'Vigo', lat: 42.2406, lng: -8.7206 },
+  'a coruña': { name: 'A Coruña', lat: 43.3623, lng: -8.4115 },
+  'coruña': { name: 'A Coruña', lat: 43.3623, lng: -8.4115 },
+  'ferrol': { name: 'Ferrol', lat: 43.4833, lng: -8.2333 },
+  'bilbao': { name: 'Bilbao', lat: 43.2627, lng: -2.9253 },
+  'santander': { name: 'Santander', lat: 43.4623, lng: -3.8099 },
+  'gijón': { name: 'Gijón', lat: 43.5453, lng: -5.6619 },
+  'gijon': { name: 'Gijón', lat: 43.5453, lng: -5.6619 },
+  'oviedo': { name: 'Gijón', lat: 43.5453, lng: -5.6619 }, // Oviedo usa datos de Gijón
+  'avilés': { name: 'Avilés', lat: 43.5567, lng: -5.9244 },
+  'aviles': { name: 'Avilés', lat: 43.5567, lng: -5.9244 },
+  'ribadeo': { name: 'Ribadeo', lat: 43.5367, lng: -7.0408 },
+  'cudillero': { name: 'Cudillero', lat: 43.5617, lng: -6.1456 },
+  'luarca': { name: 'Luarca', lat: 43.5450, lng: -6.5361 },
+  'cabo peñas': { name: 'Cabo Peñas', lat: 43.6500, lng: -5.8500 },
+  'san sebastián': { name: 'San Sebastián', lat: 43.3183, lng: -1.9812 },
+  'san sebastian': { name: 'San Sebastián', lat: 43.3183, lng: -1.9812 },
+  'donostia': { name: 'San Sebastián', lat: 43.3183, lng: -1.9812 },
+  'valencia': { name: 'Valencia', lat: 39.4699, lng: -0.3763 },
+  'barcelona': { name: 'Barcelona', lat: 41.3851, lng: 2.1734 },
+  'tarragona': { name: 'Tarragona', lat: 41.1189, lng: 1.2445 },
+  'alicante': { name: 'Alicante', lat: 38.3452, lng: -0.4810 },
+  'cartagena': { name: 'Cartagena', lat: 37.6000, lng: -0.9864 },
+  'málaga': { name: 'Málaga', lat: 36.7213, lng: -4.4214 },
+  'malaga': { name: 'Málaga', lat: 36.7213, lng: -4.4214 },
+  'cádiz': { name: 'Cádiz', lat: 36.5270, lng: -6.2886 },
+  'cadiz': { name: 'Cádiz', lat: 36.5270, lng: -6.2886 },
+  'huelva': { name: 'Huelva', lat: 37.2583, lng: -6.9508 },
+  'sevilla': { name: 'Cádiz', lat: 36.5270, lng: -6.2886 }, // Sevilla usa datos de Cádiz
+  'ceuta': { name: 'Ceuta', lat: 35.8883, lng: -5.3167 },
+  'melilla': { name: 'Melilla', lat: 35.2923, lng: -2.9381 },
+  'palma': { name: 'Palma', lat: 39.5696, lng: 2.6502 },
+  'palma de mallorca': { name: 'Palma', lat: 39.5696, lng: 2.6502 },
+  'mahón': { name: 'Mahón', lat: 39.8885, lng: 4.2614 },
+  'mahon': { name: 'Mahón', lat: 39.8885, lng: 4.2614 },
+  'las palmas': { name: 'Las Palmas', lat: 28.1248, lng: -15.4300 },
+  'santa cruz de tenerife': { name: 'Santa Cruz de Tenerife', lat: 28.4636, lng: -16.2518 },
+  'tenerife': { name: 'Santa Cruz de Tenerife', lat: 28.4636, lng: -16.2518 },
+};
+
+/**
+ * Encuentra el puerto IHM más cercano a las coordenadas dadas
+ */
+function findNearestSpanishPort(lat: number, lng: number, locationName?: string): { name: string; lat: number; lng: number } | null {
+  // Primero intentar buscar por nombre
+  if (locationName) {
+    const normalizedName = locationName.toLowerCase().trim();
+    if (SPANISH_PORT_MAPPING[normalizedName]) {
+      const port = SPANISH_PORT_MAPPING[normalizedName];
+      return { name: port.name, lat: port.lat, lng: port.lng };
+    }
+    
+    // Buscar coincidencias parciales
+    for (const [key, port] of Object.entries(SPANISH_PORT_MAPPING)) {
+      if (normalizedName.includes(key) || key.includes(normalizedName)) {
+        return { name: port.name, lat: port.lat, lng: port.lng };
+      }
+    }
+  }
+  
+  // Si no se encuentra por nombre, buscar el más cercano por distancia
+  let nearestPort: { name: string; lat: number; lng: number; distance: number } | null = null;
+  
+  for (const port of Object.values(SPANISH_PORT_MAPPING)) {
+    const distance = Math.sqrt(
+      Math.pow(lat - port.lat, 2) + Math.pow(lng - port.lng, 2)
+    );
+    
+    if (!nearestPort || distance < nearestPort.distance) {
+      nearestPort = { name: port.name, lat: port.lat, lng: port.lng, distance };
+    }
+  }
+  
+  return nearestPort ? { name: nearestPort.name, lat: nearestPort.lat, lng: nearestPort.lng } : null;
+}
+
+/**
+ * Obtiene datos de mareas desde tablademareas.com usando proxy CORS
+ * Esta fuente usa datos oficiales del IHM
+ */
+async function getTideDataFromTablademareas(portName: string): Promise<TideEvent[] | null> {
+  try {
+    // Normalizar el nombre del puerto para la URL
+    const normalizedName = portName.toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Eliminar acentos
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '');
+    
+    // Intentar acceder a tablademareas.com usando proxy CORS
+    // Nota: Esto puede fallar por CORS, en ese caso necesitaríamos un backend proxy
+    const url = `https://tablademareas.com/es/${normalizedName}`;
+    
+    // Usar un proxy CORS público (allorigins.win)
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    
+    const response = await Promise.race([
+      fetch(proxyUrl),
+      new Promise<Response>((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 10000)
+      )
+    ]);
+    
+    if (!response.ok) throw new Error('Failed to fetch from tablademareas');
+    
+    const data = await response.json();
+    const html = data.contents;
+    
+    if (!html) return null;
+    
+    // Parsear HTML para extraer datos de mareas
+    // Buscar patrones comunes en tablademareas.com
+    // Formato típico: "HH:MM X.XX m" donde X.XX es la altura
+    
+    const tides: TideEvent[] = [];
+    
+    // Buscar patrones de hora y altura
+    // Patrón 1: "HH:MM" seguido de un número decimal y "m"
+    const pattern1 = /(\d{1,2}):(\d{2})[^\d]*(\d+[,.]\d+)\s*m/gi;
+    let match;
+    const foundTides: Array<{ time: string; height: number }> = [];
+    
+    while ((match = pattern1.exec(html)) !== null && foundTides.length < 8) {
+      const hours = match[1].padStart(2, '0');
+      const minutes = match[2];
+      const height = parseFloat(match[3].replace(',', '.'));
+      
+      if (!isNaN(height) && height > 0 && height < 10) {
+        foundTides.push({
+          time: `${hours}:${minutes}`,
+          height: Math.round(height * 100) / 100
+        });
+      }
+    }
+    
+    // Si encontramos datos, clasificarlos como HIGH o LOW
+    if (foundTides.length >= 2) {
+      // Ordenar por hora
+      foundTides.sort((a, b) => a.time.localeCompare(b.time));
+      
+      // Identificar pleamares y bajamares (máximos y mínimos locales)
+      for (let i = 0; i < foundTides.length; i++) {
+        const prev = i > 0 ? foundTides[i - 1].height : foundTides[foundTides.length - 1].height;
+        const curr = foundTides[i].height;
+        const next = i < foundTides.length - 1 ? foundTides[i + 1].height : foundTides[0].height;
+        
+        // Si es un máximo local, es pleamar
+        if (curr > prev && curr > next) {
+          tides.push({
+            time: foundTides[i].time,
+            height: curr,
+            type: 'HIGH'
+          });
+        }
+        // Si es un mínimo local, es bajamar
+        else if (curr < prev && curr < next) {
+          tides.push({
+            time: foundTides[i].time,
+            height: curr,
+            type: 'LOW'
+          });
+        }
+      }
+      
+      // Si no pudimos clasificar, alternar HIGH/LOW
+      if (tides.length === 0 && foundTides.length >= 2) {
+        tides.push(
+          { time: foundTides[0].time, height: foundTides[0].height, type: 'HIGH' },
+          { time: foundTides[1].time, height: foundTides[1].height, type: 'LOW' }
+        );
+        if (foundTides.length >= 3) {
+          tides.push({ time: foundTides[2].time, height: foundTides[2].height, type: 'HIGH' });
+        }
+        if (foundTides.length >= 4) {
+          tides.push({ time: foundTides[3].time, height: foundTides[3].height, type: 'LOW' });
+        }
+      }
+    }
+    
+    return tides.length >= 2 ? tides.sort((a, b) => a.time.localeCompare(b.time)) : null;
+  } catch (error) {
+    console.error('Error fetching from tablademareas.com:', error);
+    return null;
+  }
+}
+
+/**
  * Obtiene datos de mareas usando WorldTides API (tier gratuito)
  * Alternativa: usa datos calculados si no hay API key
  */
@@ -312,7 +503,7 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
       }
     }
     
-    const { lat, lng, name } = geoData;
+    let { lat, lng, name } = geoData;
     
     // Paso 2: Obtener datos del sol (con timeout)
     let sunData = { sunrise: "07:00", sunset: "20:00" };
@@ -327,20 +518,48 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
       console.warn('Error obteniendo datos del sol, usando valores por defecto:', error);
     }
     
-    // Paso 3: Intentar obtener datos de mareas desde API
+    // Paso 3: Intentar obtener datos de mareas desde fuentes españolas oficiales
     let tides: TideEvent[] | null = null;
-    try {
-      tides = await Promise.race([
-        getTideDataFromAPI(lat, lng),
-        new Promise<TideEvent[] | null>((resolve) => setTimeout(() => resolve(null), 8000))
-      ]);
-    } catch (error) {
-      console.warn('Error obteniendo datos de API de mareas:', error);
+    let spanishPort: { name: string; lat: number; lng: number } | null = null;
+    
+    // Primero intentar encontrar un puerto español cercano
+    spanishPort = findNearestSpanishPort(lat, lng, name);
+    
+    if (spanishPort) {
+      console.log(`Usando datos del puerto IHM: ${spanishPort.name}`);
+      
+      // Intentar obtener datos de tablademareas.com (fuente oficial IHM)
+      try {
+        tides = await Promise.race([
+          getTideDataFromTablademareas(spanishPort.name),
+          new Promise<TideEvent[] | null>((resolve) => setTimeout(() => resolve(null), 10000))
+        ]);
+        
+        if (tides && tides.length > 0) {
+          console.log(`Datos obtenidos de tablademareas.com para ${spanishPort.name}`);
+          // Actualizar el nombre de la ubicación al puerto oficial
+          name = spanishPort.name;
+        }
+      } catch (error) {
+        console.warn('Error obteniendo datos de tablademareas.com:', error);
+      }
     }
     
-    // Si no hay API key o falla, usar cálculo aproximado
+    // Si no se obtuvieron datos de fuentes españolas, intentar WorldTides API
     if (!tides || tides.length === 0) {
-      console.warn('No se pudieron obtener datos de API, usando cálculo aproximado');
+      try {
+        tides = await Promise.race([
+          getTideDataFromAPI(lat, lng),
+          new Promise<TideEvent[] | null>((resolve) => setTimeout(() => resolve(null), 8000))
+        ]);
+      } catch (error) {
+        console.warn('Error obteniendo datos de API de mareas:', error);
+      }
+    }
+    
+    // Si no hay datos de ninguna API, usar cálculo aproximado
+    if (!tides || tides.length === 0) {
+      console.warn('No se pudieron obtener datos de APIs, usando cálculo aproximado');
       const today = new Date();
       tides = calculateApproximateTides(lat, lng, today);
     }
