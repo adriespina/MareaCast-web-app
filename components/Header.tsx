@@ -3,13 +3,15 @@ import { MapPin, Search, Navigation } from 'lucide-react';
 
 interface HeaderProps {
   locationName: string;
+  requestedName?: string;
+  referenceLocationName?: string;
   date: string;
   onSearch: (term: string) => void;
   onLocate: () => void;
   isLoading: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ locationName, date, onSearch, onLocate, isLoading }) => {
+export const Header: React.FC<HeaderProps> = ({ locationName, requestedName, referenceLocationName, date, onSearch, onLocate, isLoading }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -31,6 +33,20 @@ export const Header: React.FC<HeaderProps> = ({ locationName, date, onSearch, on
             {locationName}
             {isLoading && <span className="text-xs text-blue-400 animate-pulse">Actualizando...</span>}
           </h1>
+          <div className="text-xs text-blue-200 flex flex-wrap gap-2 items-center">
+            {requestedName && (
+              <span className="flex items-center gap-1">
+                <MapPin size={14} className="text-blue-400" />
+                Solicitado: {requestedName}
+              </span>
+            )}
+            {referenceLocationName && referenceLocationName !== locationName && (
+              <span className="flex items-center gap-1 text-cyan-300">
+                <MapPin size={14} className="text-cyan-400" />
+                Punto de referencia: {referenceLocationName}
+              </span>
+            )}
+          </div>
           <span className="text-sm text-gray-400 font-mono">{date}</span>
         </div>
 
