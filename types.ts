@@ -13,7 +13,14 @@ export interface SunCycle {
 export interface TideData {
   requestedName?: string;
   locationName: string;
+  referenceLocationName?: string;
   coordinates?: { lat: number; lng: number };
+  referenceCoordinates?: { lat: number; lng: number };
+  requestedCoordinates?: { lat: number; lng: number };
+  dataSource?: string;
+  isApproximate?: boolean;
+  dataDisclaimer?: string;
+  sourceError?: string;
   date: string;
   currentHeight: number;
   isRising: boolean;

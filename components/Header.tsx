@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
-import { MapPin, Search, Navigation } from 'lucide-react';
+import { MapPin, Search, Navigation, AlertTriangle } from 'lucide-react';
 
 interface HeaderProps {
   locationName: string;
+  requestedName?: string;
+  referenceLocationName?: string;
   date: string;
+  dataSource?: string;
+  isApproximate?: boolean;
+  dataDisclaimer?: string;
   onSearch: (term: string) => void;
   onLocate: () => void;
   isLoading: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ locationName, date, onSearch, onLocate, isLoading }) => {
+export const Header: React.FC<HeaderProps> = ({ locationName, requestedName, referenceLocationName, date, dataSource, isApproximate, dataDisclaimer, onSearch, onLocate, isLoading }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -31,7 +36,37 @@ export const Header: React.FC<HeaderProps> = ({ locationName, date, onSearch, on
             {locationName}
             {isLoading && <span className="text-xs text-blue-400 animate-pulse">Actualizando...</span>}
           </h1>
+          <div className="text-xs text-blue-200 flex flex-wrap gap-2 items-center">
+            {requestedName && (
+              <span className="flex items-center gap-1">
+                <MapPin size={14} className="text-blue-400" />
+                Solicitado: {requestedName}
+              </span>
+            )}
+            {referenceLocationName && referenceLocationName !== locationName && (
+              <span className="flex items-center gap-1 text-cyan-300">
+                <MapPin size={14} className="text-cyan-400" />
+                Punto de referencia: {referenceLocationName}
+              </span>
+            )}
+            {dataSource && (
+              <span className="px-2 py-1 rounded-full border border-ocean-600 bg-ocean-800 text-[11px] uppercase tracking-wide text-gray-200">
+                Fuente: {dataSource}
+              </span>
+            )}
+            {isApproximate && (
+              <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-900/60 text-amber-200 border border-amber-700 text-[11px]">
+                <AlertTriangle size={12} /> Aproximado
+              </span>
+            )}
+          </div>
           <span className="text-sm text-gray-400 font-mono">{date}</span>
+          {dataDisclaimer && (
+            <div className="mt-1 text-[11px] text-amber-200 flex items-center gap-1">
+              <AlertTriangle size={12} className="flex-shrink-0" />
+              <span>{dataDisclaimer}</span>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-3">

@@ -1,6 +1,11 @@
 import { TideData, TideEvent } from "../types";
 import { generateTideCurve, calculateCurrentHeight } from "../utils/tideMath";
 
+const AEMET_API_KEY = (import.meta.env?.VITE_AEMET_API_KEY as string)
+  || (process.env?.VITE_AEMET_API_KEY as string)
+  || "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZHJpYW4uZXNwaW5hQGdtYWlsLmNvbSIsImp0aSI6IjI1NTQ1NGFhLWM3NWYtNDEzYi04ZDJhLTcwNzBkYTM3ZTQ2ZCIsImlzcyI6IkFFTUVUIiwiaWF0IjoxNzYzNjQ2MzA2LCJ1c2VySWQiOiIyNTU0NTRhYS1jNzVmLTQxM2ItOGQyYS03MDcwZGEzN2U0NmQiLCJyb2xlIjoiIn0.OMmt_i0NLG6kRyKRczII_MdJwACSquuarSXyMaqLia0";
+const AEMET_BASE_URL = "https://opendata.aemet.es/opendata/api";
+
 // Fallback mock data for development or quota limits
 const MOCK_TIDE_DATA: Omit<TideData, 'chartData'> = {
   requestedName: "Navia",
@@ -18,6 +23,37 @@ const MOCK_TIDE_DATA: Omit<TideData, 'chartData'> = {
     { time: "23:48", height: 0.77, type: "LOW" }
   ]
 };
+
+interface TideCacheEntry {
+  tides: TideEvent[];
+  savedAt: number;
+}
+
+const TIDE_CACHE_TTL_MS = 1000 * 60 * 60 * 6; // 6 horas
+
+function loadCachedTides(key: string): TideEvent[] | null {
+  try {
+    const cached = localStorage.getItem(`tides:${key}`);
+    if (!cached) return null;
+
+    const parsed = JSON.parse(cached) as TideCacheEntry;
+    if (Date.now() - parsed.savedAt > TIDE_CACHE_TTL_MS) return null;
+
+    return parsed.tides;
+  } catch (error) {
+    console.warn('No se pudo leer la caché local de mareas', error);
+    return null;
+  }
+}
+
+function saveCachedTides(key: string, tides: TideEvent[]) {
+  try {
+    const payload: TideCacheEntry = { tides, savedAt: Date.now() };
+    localStorage.setItem(`tides:${key}`, JSON.stringify(payload));
+  } catch (error) {
+    console.warn('No se pudo guardar la caché local de mareas', error);
+  }
+}
 
 /**
  * Geocodifica un nombre de lugar o coordenadas usando Nominatim (OpenStreetMap)
@@ -140,8 +176,10 @@ async function getSunTimes(lat: number, lng: number): Promise<{ sunrise: string;
  * Mapeo de ciudades españolas a puertos IHM más cercanos
  * Basado en el Anuario de Mareas del IHM
  */
-const SPANISH_PORT_MAPPING: { [key: string]: { name: string; lat: number; lng: number; code?: string } } = {
-  'vigo': { name: 'Vigo', lat: 42.2406, lng: -8.7206 },
+type SpanishPort = { name: string; lat: number; lng: number; code?: string; aemetId?: string };
+
+const SPANISH_PORT_MAPPING: { [key: string]: SpanishPort } = {
+  'vigo': { name: 'Vigo', lat: 42.2406, lng: -8.7206, aemetId: '36057' },
   'a coruña': { name: 'A Coruña', lat: 43.3623, lng: -8.4115 },
   'coruña': { name: 'A Coruña', lat: 43.3623, lng: -8.4115 },
   'ferrol': { name: 'Ferrol', lat: 43.4833, lng: -8.2333 },
@@ -150,11 +188,11 @@ const SPANISH_PORT_MAPPING: { [key: string]: { name: string; lat: number; lng: n
   'gijón': { name: 'Gijón', lat: 43.5453, lng: -5.6619 },
   'gijon': { name: 'Gijón', lat: 43.5453, lng: -5.6619 },
   'oviedo': { name: 'Gijón', lat: 43.5453, lng: -5.6619 }, // Oviedo usa datos de Gijón
-  'avilés': { name: 'Avilés', lat: 43.5567, lng: -5.9244 },
-  'aviles': { name: 'Avilés', lat: 43.5567, lng: -5.9244 },
+  'avilés': { name: 'Avilés', lat: 43.5567, lng: -5.9244, aemetId: '33004' },
+  'aviles': { name: 'Avilés', lat: 43.5567, lng: -5.9244, aemetId: '33004' },
   'ribadeo': { name: 'Ribadeo', lat: 43.5367, lng: -7.0408 },
   'cudillero': { name: 'Cudillero', lat: 43.5617, lng: -6.1456 },
-  'luarca': { name: 'Luarca', lat: 43.5450, lng: -6.5361 },
+  'luarca': { name: 'Luarca', lat: 43.5450, lng: -6.5361, aemetId: '33031' },
   'cabo peñas': { name: 'Cabo Peñas', lat: 43.6500, lng: -5.8500 },
   'san sebastián': { name: 'San Sebastián', lat: 43.3183, lng: -1.9812 },
   'san sebastian': { name: 'San Sebastián', lat: 43.3183, lng: -1.9812 },
@@ -184,19 +222,19 @@ const SPANISH_PORT_MAPPING: { [key: string]: { name: string; lat: number; lng: n
 /**
  * Encuentra el puerto IHM más cercano a las coordenadas dadas
  */
-function findNearestSpanishPort(lat: number, lng: number, locationName?: string): { name: string; lat: number; lng: number } | null {
+function findNearestSpanishPort(lat: number, lng: number, locationName?: string): (SpanishPort & { distance?: number }) | null {
   // Primero intentar buscar por nombre
   if (locationName) {
     const normalizedName = locationName.toLowerCase().trim();
     if (SPANISH_PORT_MAPPING[normalizedName]) {
       const port = SPANISH_PORT_MAPPING[normalizedName];
-      return { name: port.name, lat: port.lat, lng: port.lng };
+      return { ...port };
     }
     
     // Buscar coincidencias parciales
     for (const [key, port] of Object.entries(SPANISH_PORT_MAPPING)) {
       if (normalizedName.includes(key) || key.includes(normalizedName)) {
-        return { name: port.name, lat: port.lat, lng: port.lng };
+        return { ...port };
       }
     }
   }
@@ -214,7 +252,87 @@ function findNearestSpanishPort(lat: number, lng: number, locationName?: string)
     }
   }
   
-  return nearestPort ? { name: nearestPort.name, lat: nearestPort.lat, lng: nearestPort.lng } : null;
+  return nearestPort ? { ...nearestPort } : null;
+}
+
+function normalizeAemetTides(raw: any): TideEvent[] | null {
+  const candidateDays = Array.isArray(raw) ? raw : [raw];
+  const tides: TideEvent[] = [];
+
+  for (const day of candidateDays) {
+    const entries = day?.prediccion?.mareas || day?.prediccion?.marea || day?.mareas || [];
+    if (Array.isArray(entries)) {
+      for (const entry of entries) {
+        const time = entry.hora || entry.horario || entry.horaMarea || entry.hora_marea;
+        const height = Number(entry.altura || entry.valor || entry.alturaMarea);
+        const typeLabel = (entry.tipo || entry.estado || "").toString().toUpperCase();
+
+        if (time && !isNaN(height)) {
+          const type: TideEvent['type'] = typeLabel.includes('PLEA') || typeLabel.includes('ALTA') ? 'HIGH' : 'LOW';
+          tides.push({ time, height: Math.round(height * 100) / 100, type });
+        }
+      }
+    }
+
+    // Si la estructura no es clara, intentar parsear texto libre
+    if (tides.length === 0 && day) {
+      const serialized = JSON.stringify(day);
+      const pattern = /(pleamar|bajamar)[^0-9]*(\d{1,2}:\d{2})[^0-9]*([0-9]+[,.]?[0-9]*)/gi;
+      let match;
+      while ((match = pattern.exec(serialized)) !== null) {
+        tides.push({
+          time: match[2],
+          height: Math.round(parseFloat(match[3].replace(',', '.')) * 100) / 100,
+          type: match[1].toLowerCase().includes('plea') ? 'HIGH' : 'LOW'
+        });
+      }
+    }
+  }
+
+  if (tides.length === 0) return null;
+
+  const uniqueTides = tides
+    .filter((tide) => tide.time && !isNaN(tide.height))
+    .reduce((acc: TideEvent[], tide) => {
+      const exists = acc.find((t) => t.time === tide.time && t.type === tide.type);
+      if (!exists) acc.push(tide);
+      return acc;
+    }, []);
+
+  return uniqueTides.sort((a, b) => a.time.localeCompare(b.time));
+}
+
+async function fetchAemetTideData(port: SpanishPort): Promise<TideEvent[] | null> {
+  if (!AEMET_API_KEY) return null;
+
+  const cacheKey = port.name.toLowerCase().replace(/\s+/g, '-');
+  const cached = loadCachedTides(cacheKey);
+  if (cached) return cached;
+
+  if (!port.aemetId) return null;
+
+  const metaUrl = `${AEMET_BASE_URL}/prediccion/maritima/playa/${port.aemetId}?api_key=${AEMET_API_KEY}`;
+
+  try {
+    const metaResponse = await fetch(metaUrl);
+    if (!metaResponse.ok) throw new Error('No se pudo obtener el índice de mareas de AEMET');
+    const meta = await metaResponse.json();
+    if (!meta?.datos) return null;
+
+    const dataResponse = await fetch(meta.datos);
+    if (!dataResponse.ok) throw new Error('No se pudieron descargar los datos de AEMET');
+    const payload = await dataResponse.json();
+
+    const tides = normalizeAemetTides(payload);
+    if (tides && tides.length > 0) {
+      saveCachedTides(cacheKey, tides);
+      return tides;
+    }
+    return null;
+  } catch (error) {
+    console.warn('Error al consultar mareas en AEMET', error);
+    return null;
+  }
 }
 
 /**
@@ -485,9 +603,18 @@ function calculateApproximateTides(lat: number, lng: number, date: Date): TideEv
  */
 export const fetchTideData = async (locationQuery: string): Promise<TideData> => {
   try {
+    const isBrowser = typeof window !== 'undefined';
+    const allowDirectAemet = !isBrowser || window.location.hostname === 'localhost';
+    const allowDirectScrape = allowDirectAemet;
+
+    let dataSource = '';
+    let dataDisclaimer: string | undefined;
+    let sourceError: string | undefined;
+    let isApproximate = false;
+
     // Paso 1: Geocodificar la ubicación
     let geoData = await geocodeLocation(locationQuery);
-    
+
     // Si falla el geocoding, usar coordenadas por defecto o intentar parsear
     if (!geoData) {
       // Intentar parsear coordenadas directamente
@@ -502,8 +629,11 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
         console.warn('Geocoding falló, usando coordenadas por defecto');
       }
     }
-    
+
     let { lat, lng, name } = geoData;
+    const requestedCoordinates = { lat, lng };
+    let referenceLocationName: string | undefined;
+    let referenceCoordinates: { lat: number; lng: number } | undefined;
     
     // Paso 2: Obtener datos del sol (con timeout)
     let sunData = { sunrise: "07:00", sunset: "20:00" };
@@ -518,33 +648,56 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
       console.warn('Error obteniendo datos del sol, usando valores por defecto:', error);
     }
     
-    // Paso 3: Intentar obtener datos de mareas desde fuentes españolas oficiales
+    // Paso 3: Intentar obtener datos de mareas desde fuentes españolas oficiales y cache local
     let tides: TideEvent[] | null = null;
-    let spanishPort: { name: string; lat: number; lng: number } | null = null;
-    
+    let spanishPort: (SpanishPort & { distance?: number }) | null = null;
+
     // Primero intentar encontrar un puerto español cercano
     spanishPort = findNearestSpanishPort(lat, lng, name);
-    
+
     if (spanishPort) {
-      console.log(`Usando datos del puerto IHM: ${spanishPort.name}`);
-      
-      // Intentar obtener datos de tablademareas.com (fuente oficial IHM)
-      try {
-        tides = await Promise.race([
-          getTideDataFromTablademareas(spanishPort.name),
-          new Promise<TideEvent[] | null>((resolve) => setTimeout(() => resolve(null), 10000))
-        ]);
-        
-        if (tides && tides.length > 0) {
-          console.log(`Datos obtenidos de tablademareas.com para ${spanishPort.name}`);
-          // Actualizar el nombre de la ubicación al puerto oficial
-          name = spanishPort.name;
+      console.log(`Usando puerto más cercano para mareas: ${spanishPort.name}`);
+      name = spanishPort.name;
+      lat = spanishPort.lat;
+      lng = spanishPort.lng;
+      referenceLocationName = spanishPort.name;
+      referenceCoordinates = { lat: spanishPort.lat, lng: spanishPort.lng };
+
+      if (allowDirectAemet) {
+        try {
+          tides = await Promise.race([
+            fetchAemetTideData(spanishPort),
+            new Promise<TideEvent[] | null>((resolve) => setTimeout(() => resolve(null), 10000))
+          ]);
+          if (tides && tides.length > 0) {
+            dataSource = 'AEMET (predicción marítima)';
+          }
+        } catch (error: any) {
+          console.warn('Error obteniendo datos de AEMET:', error);
+          sourceError = 'AEMET no disponible (CORS o red).';
         }
-      } catch (error) {
-        console.warn('Error obteniendo datos de tablademareas.com:', error);
+      } else {
+        sourceError = 'AEMET requiere un proxy backend por CORS en producción.';
+      }
+
+      // Fallback a fuente IHM si AEMET falla
+      if ((!tides || tides.length === 0) && allowDirectScrape) {
+        try {
+          tides = await Promise.race([
+            getTideDataFromTablademareas(spanishPort.name),
+            new Promise<TideEvent[] | null>((resolve) => setTimeout(() => resolve(null), 10000))
+          ]);
+          if (tides && tides.length > 0) {
+            dataSource = 'tablademareas.com (IHM)';
+          }
+        } catch (error) {
+          console.warn('Error obteniendo datos de tablademareas.com:', error);
+        }
+      } else if (!allowDirectScrape && (!tides || tides.length === 0)) {
+        sourceError = 'Necesitas un proxy para consultar tablademareas.com sin CORS.';
       }
     }
-    
+
     // Si no se obtuvieron datos de fuentes españolas, intentar WorldTides API
     if (!tides || tides.length === 0) {
       try {
@@ -552,18 +705,26 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
           getTideDataFromAPI(lat, lng),
           new Promise<TideEvent[] | null>((resolve) => setTimeout(() => resolve(null), 8000))
         ]);
+        if (tides && tides.length > 0) {
+          dataSource = 'WorldTides API (estimación)';
+        }
       } catch (error) {
         console.warn('Error obteniendo datos de API de mareas:', error);
       }
     }
-    
+
     // Si no hay datos de ninguna API, usar cálculo aproximado
     if (!tides || tides.length === 0) {
       console.warn('No se pudieron obtener datos de APIs, usando cálculo aproximado');
       const today = new Date();
       tides = calculateApproximateTides(lat, lng, today);
+      isApproximate = true;
+      dataSource = dataSource || 'Cálculo aproximado local';
+      dataDisclaimer = sourceError
+        ? `Datos aproximados por falta de respuesta de APIs (p.ej. CORS): ${sourceError}`
+        : 'Datos aproximados calculados localmente; confirma con una fuente oficial si necesitas precisión.';
     }
-    
+
     if (!tides || tides.length === 0) {
       throw new Error('No se pudieron calcular datos de mareas');
     }
@@ -579,11 +740,25 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
     const range = maxHeight - minHeight;
     // Coeficiente aproximado: 0-120, basado en el rango de marea
     const coefficient = Math.min(120, Math.max(20, Math.round((range / 4) * 100)));
-    
+
+    if (!dataSource) {
+      dataSource = 'Origen no determinado';
+    }
+    if (isApproximate && !dataDisclaimer) {
+      dataDisclaimer = 'Datos aproximados generados al no disponer de predicción oficial en este entorno.';
+    }
+
     return {
       requestedName: locationQuery,
       locationName: name,
       coordinates: { lat, lng },
+      referenceLocationName,
+      referenceCoordinates,
+      requestedCoordinates,
+      dataSource,
+      isApproximate,
+      dataDisclaimer,
+      sourceError,
       date: new Date().toLocaleDateString('es-ES'),
       coefficient,
       sun: sunData,
@@ -597,11 +772,16 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
     console.error("Error fetching tide data:", error);
     // Retornar datos mock en caso de error - asegurar que siempre retornamos datos válidos
     const chartData = generateTideCurve(MOCK_TIDE_DATA.tides as TideEvent[]);
-    return { 
-      ...MOCK_TIDE_DATA, 
-      requestedName: locationQuery || "Vigo", 
-      locationName: `${locationQuery || "Vigo"} (Simulado)`, 
-      chartData 
+    return {
+      ...MOCK_TIDE_DATA,
+      requestedName: locationQuery || "Vigo",
+      referenceLocationName: `${locationQuery || "Vigo"} (simulado)`,
+      locationName: `${locationQuery || "Vigo"} (Simulado)`,
+      requestedCoordinates: MOCK_TIDE_DATA.coordinates,
+      dataSource: 'Simulación de respaldo',
+      isApproximate: true,
+      dataDisclaimer: 'Datos simulados por error en las fuentes oficiales. Configura un proxy AEMET/tablas en producción para obtener datos reales.',
+      chartData
     } as TideData;
   }
 };

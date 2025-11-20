@@ -4,9 +4,10 @@ import { MapPin } from 'lucide-react';
 interface MapViewProps {
   locationName?: string;
   coordinates?: { lat: number; lng: number };
+  requestedName?: string;
 }
 
-export const MapView: React.FC<MapViewProps> = ({ locationName, coordinates }) => {
+export const MapView: React.FC<MapViewProps> = ({ locationName, coordinates, requestedName }) => {
   // Construct the Embed URL.
   // t=h (hybrid) looks better for coastal/nature apps than standard roadmap (m)
   // z=13 is a good zoom level for town/coastal areas
@@ -50,6 +51,14 @@ export const MapView: React.FC<MapViewProps> = ({ locationName, coordinates }) =
       {locationName && (
         <div className="absolute top-4 left-4 bg-ocean-900/80 backdrop-blur-md px-3 py-1 rounded-full border border-ocean-600/50 text-xs font-mono text-blue-300 shadow-lg pointer-events-none">
           Lat: {coordinates?.lat.toFixed(4) || '?'} • Lng: {coordinates?.lng.toFixed(4) || '?'}
+        </div>
+      )}
+
+      {requestedName && requestedName !== locationName && (
+        <div className="absolute bottom-4 left-4 bg-ocean-900/80 backdrop-blur-md px-3 py-2 rounded-lg border border-ocean-600/50 text-[11px] text-blue-100 shadow-lg pointer-events-none max-w-[260px]">
+          <div className="font-semibold text-cyan-300">Referencia geográfica</div>
+          <div>Solicitado: {requestedName}</div>
+          <div>Usando estación más cercana: {locationName}</div>
         </div>
       )}
     </div>
