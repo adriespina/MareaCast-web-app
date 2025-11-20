@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { MapPin, Search, Navigation } from 'lucide-react';
+import { MapPin, Search, Navigation, AlertTriangle } from 'lucide-react';
 
 interface HeaderProps {
   locationName: string;
   requestedName?: string;
   referenceLocationName?: string;
   date: string;
+  dataSource?: string;
+  isApproximate?: boolean;
+  dataDisclaimer?: string;
   onSearch: (term: string) => void;
   onLocate: () => void;
   isLoading: boolean;
@@ -48,6 +51,12 @@ export const Header: React.FC<HeaderProps> = ({ locationName, requestedName, ref
             )}
           </div>
           <span className="text-sm text-gray-400 font-mono">{date}</span>
+          {dataDisclaimer && (
+            <div className="mt-1 text-[11px] text-amber-200 flex items-center gap-1">
+              <AlertTriangle size={12} className="flex-shrink-0" />
+              <span>{dataDisclaimer}</span>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-3">

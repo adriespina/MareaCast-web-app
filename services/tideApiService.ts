@@ -603,9 +603,18 @@ function calculateApproximateTides(lat: number, lng: number, date: Date): TideEv
  */
 export const fetchTideData = async (locationQuery: string): Promise<TideData> => {
   try {
+    const isBrowser = typeof window !== 'undefined';
+    const allowDirectAemet = !isBrowser || window.location.hostname === 'localhost';
+    const allowDirectScrape = allowDirectAemet;
+
+    let dataSource = '';
+    let dataDisclaimer: string | undefined;
+    let sourceError: string | undefined;
+    let isApproximate = false;
+
     // Paso 1: Geocodificar la ubicación
     let geoData = await geocodeLocation(locationQuery);
-    
+
     // Si falla el geocoding, usar coordenadas por defecto o intentar parsear
     if (!geoData) {
       // Intentar parsear coordenadas directamente
@@ -620,7 +629,7 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
         console.warn('Geocoding falló, usando coordenadas por defecto');
       }
     }
-    
+
     let { lat, lng, name } = geoData;
     const requestedCoordinates = { lat, lng };
     let referenceLocationName: string | undefined;
@@ -683,6 +692,9 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
           getTideDataFromAPI(lat, lng),
           new Promise<TideEvent[] | null>((resolve) => setTimeout(() => resolve(null), 8000))
         ]);
+        if (tides && tides.length > 0) {
+          dataSource = 'WorldTides API (estimación)';
+        }
       } catch (error) {
         console.warn('Error obteniendo datos de API de mareas:', error);
       }
@@ -693,8 +705,13 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
       console.warn('No se pudieron obtener datos de APIs, usando cálculo aproximado');
       const today = new Date();
       tides = calculateApproximateTides(lat, lng, today);
+      isApproximate = true;
+      dataSource = dataSource || 'Cálculo aproximado local';
+      dataDisclaimer = sourceError
+        ? `Datos aproximados por falta de respuesta de APIs (p.ej. CORS): ${sourceError}`
+        : 'Datos aproximados calculados localmente; confirma con una fuente oficial si necesitas precisión.';
     }
-    
+
     if (!tides || tides.length === 0) {
       throw new Error('No se pudieron calcular datos de mareas');
     }
@@ -710,7 +727,14 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
     const range = maxHeight - minHeight;
     // Coeficiente aproximado: 0-120, basado en el rango de marea
     const coefficient = Math.min(120, Math.max(20, Math.round((range / 4) * 100)));
-    
+
+    if (!dataSource) {
+      dataSource = 'Origen no determinado';
+    }
+    if (isApproximate && !dataDisclaimer) {
+      dataDisclaimer = 'Datos aproximados generados al no disponer de predicción oficial en este entorno.';
+    }
+
     return {
       requestedName: locationQuery,
       locationName: name,

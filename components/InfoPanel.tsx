@@ -1,6 +1,6 @@
 import React from 'react';
 import { TideData } from '../types';
-import { ArrowUp, ArrowDown, Sunrise, Sunset, Waves } from 'lucide-react';
+import { ArrowUp, ArrowDown, Sunrise, Sunset, Waves, AlertTriangle } from 'lucide-react';
 
 interface InfoPanelProps {
   data: TideData;
@@ -28,6 +28,16 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({ data }) => {
             <Waves size={16} />
             <span>Coef: {data.coefficient}</span>
           </div>
+          {data.dataSource && (
+            <div className="mt-2 text-[11px] text-blue-100">
+              Fuente: {data.dataSource}
+            </div>
+          )}
+          {data.isApproximate && (
+            <div className="mt-1 flex items-center gap-2 text-[11px] text-amber-200">
+              <AlertTriangle size={12} /> Datos aproximados
+            </div>
+          )}
         </div>
       </div>
 
@@ -59,7 +69,12 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({ data }) => {
 
       {/* Next Tide Quick View */}
       <div className="mt-auto">
-         {/* Space filler if needed */}
+         {data.dataDisclaimer && (
+           <div className="text-[11px] text-amber-200/90 bg-amber-900/30 border border-amber-700 rounded-md p-2 flex items-start gap-2">
+             <AlertTriangle size={12} className="mt-0.5 flex-shrink-0" />
+             <span>{data.dataDisclaimer}</span>
+           </div>
+         )}
       </div>
     </div>
   );
