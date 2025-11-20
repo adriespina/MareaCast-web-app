@@ -119,9 +119,11 @@ const App: React.FC = () => {
       onContextMenu={handleContextMenu}
     >
       {/* Top Bar */}
-      <Header 
-        locationName={data?.locationName || location} 
-        date={data?.date || ""} 
+      <Header
+        locationName={data?.locationName || location}
+        requestedName={data?.requestedName || location}
+        referenceLocationName={data?.referenceLocationName}
+        date={data?.date || ""}
         onSearch={handleSearch}
         onLocate={handleLocate}
         isLoading={loading}
@@ -130,9 +132,10 @@ const App: React.FC = () => {
       <main className="flex-1 flex flex-col max-w-5xl mx-auto w-full shadow-2xl bg-ocean-800 overflow-hidden md:my-8 md:rounded-xl border border-ocean-700">
         
         {/* Top Map Strip */}
-        <MapView 
-          locationName={data?.locationName || location} 
+        <MapView
+          locationName={data?.locationName || location}
           coordinates={data?.coordinates}
+          requestedName={data?.requestedName}
         />
 
         {/* Main Content Area - Split View */}
