@@ -123,9 +123,6 @@ const App: React.FC = () => {
         locationName={data?.locationName || location}
         requestedName={data?.requestedName || location}
         referenceLocationName={data?.referenceLocationName}
-        dataSource={data?.dataSource}
-        isApproximate={data?.isApproximate}
-        dataDisclaimer={data?.dataDisclaimer}
         date={data?.date || ""}
         onSearch={handleSearch}
         onLocate={handleLocate}

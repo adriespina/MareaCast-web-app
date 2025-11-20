@@ -14,7 +14,7 @@ interface HeaderProps {
   isLoading: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ locationName, requestedName, referenceLocationName, date, dataSource, isApproximate, dataDisclaimer, onSearch, onLocate, isLoading }) => {
+export const Header: React.FC<HeaderProps> = ({ locationName, requestedName, referenceLocationName, date, onSearch, onLocate, isLoading }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -47,16 +47,6 @@ export const Header: React.FC<HeaderProps> = ({ locationName, requestedName, ref
               <span className="flex items-center gap-1 text-cyan-300">
                 <MapPin size={14} className="text-cyan-400" />
                 Punto de referencia: {referenceLocationName}
-              </span>
-            )}
-            {dataSource && (
-              <span className="px-2 py-1 rounded-full border border-ocean-600 bg-ocean-800 text-[11px] uppercase tracking-wide text-gray-200">
-                Fuente: {dataSource}
-              </span>
-            )}
-            {isApproximate && (
-              <span className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-900/60 text-amber-200 border border-amber-700 text-[11px]">
-                <AlertTriangle size={12} /> Aproximado
               </span>
             )}
           </div>

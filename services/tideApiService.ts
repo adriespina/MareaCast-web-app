@@ -663,38 +663,25 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
       referenceLocationName = spanishPort.name;
       referenceCoordinates = { lat: spanishPort.lat, lng: spanishPort.lng };
 
-      if (allowDirectAemet) {
-        try {
-          tides = await Promise.race([
-            fetchAemetTideData(spanishPort),
-            new Promise<TideEvent[] | null>((resolve) => setTimeout(() => resolve(null), 10000))
-          ]);
-          if (tides && tides.length > 0) {
-            dataSource = 'AEMET (predicción marítima)';
-          }
-        } catch (error: any) {
-          console.warn('Error obteniendo datos de AEMET:', error);
-          sourceError = 'AEMET no disponible (CORS o red).';
-        }
-      } else {
-        sourceError = 'AEMET requiere un proxy backend por CORS en producción.';
+      try {
+        tides = await Promise.race([
+          fetchAemetTideData(spanishPort),
+          new Promise<TideEvent[] | null>((resolve) => setTimeout(() => resolve(null), 10000))
+        ]);
+      } catch (error) {
+        console.warn('Error obteniendo datos de AEMET:', error);
       }
 
       // Fallback a fuente IHM si AEMET falla
-      if ((!tides || tides.length === 0) && allowDirectScrape) {
+      if (!tides || tides.length === 0) {
         try {
           tides = await Promise.race([
             getTideDataFromTablademareas(spanishPort.name),
             new Promise<TideEvent[] | null>((resolve) => setTimeout(() => resolve(null), 10000))
           ]);
-          if (tides && tides.length > 0) {
-            dataSource = 'tablademareas.com (IHM)';
-          }
         } catch (error) {
           console.warn('Error obteniendo datos de tablademareas.com:', error);
         }
-      } else if (!allowDirectScrape && (!tides || tides.length === 0)) {
-        sourceError = 'Necesitas un proxy para consultar tablademareas.com sin CORS.';
       }
     }
 
@@ -755,10 +742,6 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
       referenceLocationName,
       referenceCoordinates,
       requestedCoordinates,
-      dataSource,
-      isApproximate,
-      dataDisclaimer,
-      sourceError,
       date: new Date().toLocaleDateString('es-ES'),
       coefficient,
       sun: sunData,
@@ -778,9 +761,6 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
       referenceLocationName: `${locationQuery || "Vigo"} (simulado)`,
       locationName: `${locationQuery || "Vigo"} (Simulado)`,
       requestedCoordinates: MOCK_TIDE_DATA.coordinates,
-      dataSource: 'Simulación de respaldo',
-      isApproximate: true,
-      dataDisclaimer: 'Datos simulados por error en las fuentes oficiales. Configura un proxy AEMET/tablas en producción para obtener datos reales.',
       chartData
     } as TideData;
   }
