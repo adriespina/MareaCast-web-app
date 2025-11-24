@@ -19,6 +19,7 @@ export const Header: React.FC<HeaderProps> = ({
   requestedName,
   referenceLocationName,
   date,
+  dataDisclaimer,
   onSearch,
   onLocate,
   isLoading,
