@@ -25,14 +25,10 @@ const App: React.FC = () => {
       setData(tideData);
     } catch (error) {
       console.error("Failed to load data", error);
-      // Asegurar que siempre tenemos datos, incluso si falla
-      // fetchTideData siempre retorna datos (mock si falla), pero por si acaso:
-      try {
-        const fallbackData = await fetchTideData("Vigo");
-        setData(fallbackData);
-      } catch (fallbackError) {
-        console.error("Fallback also failed", fallbackError);
-      }
+      const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+      // Mostrar error al usuario en lugar de datos mock
+      setData(null);
+      alert(`No se pudieron obtener datos de mareas: ${errorMessage}\n\nPor favor, intente más tarde o verifique su conexión a internet.`);
     } finally {
       setLoading(false);
     }

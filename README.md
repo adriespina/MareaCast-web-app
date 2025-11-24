@@ -29,14 +29,13 @@ La aplicación utiliza las siguientes fuentes de datos, priorizando fuentes ofic
   - Mapeo automático de ciudades a puertos más cercanos
   - Incluye más de 30 puertos españoles principales
 
-### APIs Públicas Internacionales
+### APIs Públicas de Soporte
 - **Nominatim (OpenStreetMap)**: Geocodificación gratuita para convertir nombres de lugares a coordenadas
 - **Sunrise-Sunset API**: Datos de salida y puesta del sol
-- **WorldTides API** (opcional): Predicciones precisas de mareas (requiere API key gratuita)
-  - Se usa como fallback si no hay datos disponibles de fuentes españolas
 
 ### Fallback
-- **Cálculo astronómico**: Fórmulas de marea cuando no hay datos de APIs disponibles
+- **Cálculo astronómico**: Fórmulas de marea cuando no hay datos disponibles del IHM
+  - Solo se usa como último recurso si no se pueden obtener datos oficiales
 
 ## Instalación y Uso
 
@@ -47,11 +46,7 @@ La aplicación utiliza las siguientes fuentes de datos, priorizando fuentes ofic
    npm install
    ```
 
-2. (Opcional) Configurar variables de entorno en `.env.local`:
-   ```
-   WORLDTIDES_API_KEY=tu_api_key_aqui
-   ```
-   > Nota: Puedes obtener una API key gratuita en [WorldTides.info](https://www.worldtides.info/apidocs) (1000 requests/mes gratis)
+2. No se requieren API keys - la aplicación usa datos públicos del IHM
 
 3. Ejecutar la aplicación:
    ```bash
@@ -68,8 +63,8 @@ La aplicación utiliza las siguientes fuentes de datos, priorizando fuentes ofic
 La aplicación está configurada para desplegarse automáticamente en Vercel:
 
 1. Conecta tu repositorio a Vercel
-2. (Opcional) Agrega `WORLDTIDES_API_KEY` en las variables de entorno de Vercel
-3. Vercel detectará automáticamente la configuración y desplegará la app
+2. Vercel detectará automáticamente la configuración y desplegará la app
+3. No se requieren variables de entorno adicionales
 
 ## Tecnologías
 
