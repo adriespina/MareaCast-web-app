@@ -127,9 +127,7 @@ function findNearestPort(
   return closest;
 }
 
-function parseIhmTides(
-  data: IhmTideResponse,
-): {
+function parseIhmTides(data: IhmTideResponse): {
   tides: TideEvent[];
   portName?: string;
   coords?: { lat: number; lng: number };
@@ -269,6 +267,41 @@ function calculateApproximateTides(lat: number, lng: number): TideEvent[] {
 }
 
 /**
+ * Obtiene amanecer/atardecer desde sunrise-sunset.org en hora local.
+ */
+async function getSunTimes(
+  lat: number,
+  lng: number,
+): Promise<{ sunrise: string; sunset: string }> {
+  try {
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}-${String(
+      today.getMonth() + 1,
+    ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const url = `https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lng}&date=${dateStr}&formatted=0`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Fallo en la API de amanecer/atardecer");
+    const data = await response.json();
+    if (data.status !== "OK") throw new Error("La API de sol devolvió error");
+
+    const toLocal = (isoString: string) => {
+      const d = new Date(isoString);
+      const hours = String(d.getHours()).padStart(2, "0");
+      const minutes = String(d.getMinutes()).padStart(2, "0");
+      return `${hours}:${minutes}`;
+    };
+
+    return {
+      sunrise: toLocal(data.results.sunrise),
+      sunset: toLocal(data.results.sunset),
+    };
+  } catch (error) {
+    console.error("Error obteniendo datos del sol:", error);
+    return { sunrise: "07:00", sunset: "20:00" };
+  }
+}
+
+/**
  * Función principal: consulta mareas de IHM y, si no, aproxima.
  */
 export const fetchTideData = async (
@@ -368,6 +401,7 @@ export const fetchTideData = async (
       120,
       Math.max(20, Math.round((range / 4) * 100)),
     );
+    const sun = await getSunTimes(lat, lng);
 
     return {
       requestedName: query,
@@ -378,7 +412,7 @@ export const fetchTideData = async (
       requestedCoordinates,
       date: new Date().toLocaleDateString("es-ES"),
       coefficient,
-      sun: { sunrise: "07:00", sunset: "20:00" }, // La API IHM no expone datos solares; mantenemos valores por defecto.
+      sun,
       tides: tides.sort((a, b) => a.time.localeCompare(b.time)),
       currentHeight,
       isRising,
