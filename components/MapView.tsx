@@ -1,5 +1,5 @@
-import React from 'react';
-import { MapPin } from 'lucide-react';
+import React from "react";
+import { MapPin } from "lucide-react";
 
 interface MapViewProps {
   locationName?: string;
@@ -7,13 +7,17 @@ interface MapViewProps {
   requestedName?: string;
 }
 
-export const MapView: React.FC<MapViewProps> = ({ locationName, coordinates, requestedName }) => {
+export const MapView: React.FC<MapViewProps> = ({
+  locationName,
+  coordinates,
+  requestedName,
+}) => {
   // Construct the Embed URL.
   // t=h (hybrid) looks better for coastal/nature apps than standard roadmap (m)
   // z=13 is a good zoom level for town/coastal areas
-  const mapUrl = coordinates 
+  const mapUrl = coordinates
     ? `https://maps.google.com/maps?q=${coordinates.lat},${coordinates.lng}&t=h&z=13&ie=UTF8&iwloc=&output=embed`
-    : locationName 
+    : locationName
       ? `https://maps.google.com/maps?q=${encodeURIComponent(locationName)}&t=h&z=12&ie=UTF8&iwloc=&output=embed`
       : "";
 
@@ -25,10 +29,10 @@ export const MapView: React.FC<MapViewProps> = ({ locationName, coordinates, req
           height="100%"
           src={mapUrl}
           className="w-full h-full opacity-80 group-hover:opacity-100 transition-opacity duration-500"
-          style={{ 
-            border: 0, 
+          style={{
+            border: 0,
             // CSS filters to darken the map to match the app theme
-            filter: 'grayscale(20%) contrast(1.1) brightness(0.85)' 
+            filter: "grayscale(20%) contrast(1.1) brightness(0.85)",
           }}
           allowFullScreen
           loading="lazy"
@@ -43,20 +47,23 @@ export const MapView: React.FC<MapViewProps> = ({ locationName, coordinates, req
           </div>
         </div>
       )}
-      
+
       {/* Overlay gradient for smooth transition to app content at the bottom */}
       <div className="absolute bottom-0 left-0 w-full h-16 bg-gradient-to-t from-ocean-800 to-transparent pointer-events-none"></div>
-      
+
       {/* Location badge overlay */}
       {locationName && (
         <div className="absolute top-4 left-4 bg-ocean-900/80 backdrop-blur-md px-3 py-1 rounded-full border border-ocean-600/50 text-xs font-mono text-blue-300 shadow-lg pointer-events-none">
-          Lat: {coordinates?.lat.toFixed(4) || '?'} • Lng: {coordinates?.lng.toFixed(4) || '?'}
+          Lat: {coordinates?.lat.toFixed(4) || "?"} • Lng:{" "}
+          {coordinates?.lng.toFixed(4) || "?"}
         </div>
       )}
 
       {requestedName && requestedName !== locationName && (
         <div className="absolute bottom-4 left-4 bg-ocean-900/80 backdrop-blur-md px-3 py-2 rounded-lg border border-ocean-600/50 text-[11px] text-blue-100 shadow-lg pointer-events-none max-w-[260px]">
-          <div className="font-semibold text-cyan-300">Referencia geográfica</div>
+          <div className="font-semibold text-cyan-300">
+            Referencia geográfica
+          </div>
           <div>Solicitado: {requestedName}</div>
           <div>Usando estación más cercana: {locationName}</div>
         </div>

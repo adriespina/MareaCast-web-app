@@ -3,11 +3,11 @@ import { TideData, TideEvent } from "../types";
 import { generateTideCurve, calculateCurrentHeight } from "../utils/tideMath";
 
 // Fallback mock data for development or quota limits
-const MOCK_TIDE_DATA: Omit<TideData, 'chartData'> = {
+const MOCK_TIDE_DATA: Omit<TideData, "chartData"> = {
   requestedName: "Navia",
   locationName: "Navia (Simulado)",
   coordinates: { lat: 43.54, lng: -6.72 },
-  date: new Date().toLocaleDateString('es-ES'),
+  date: new Date().toLocaleDateString("es-ES"),
   currentHeight: 2.56,
   isRising: false,
   coefficient: 82,
@@ -16,13 +16,15 @@ const MOCK_TIDE_DATA: Omit<TideData, 'chartData'> = {
     { time: "05:12", height: 4.1, type: "HIGH" },
     { time: "11:24", height: 0.6, type: "LOW" },
     { time: "17:41", height: 4.02, type: "HIGH" },
-    { time: "23:48", height: 0.77, type: "LOW" }
-  ]
+    { time: "23:48", height: 0.77, type: "LOW" },
+  ],
 };
 
-export const fetchTideData = async (locationQuery: string): Promise<TideData> => {
+export const fetchTideData = async (
+  locationQuery: string,
+): Promise<TideData> => {
   const apiKey = process.env.GEMINI_API_KEY;
-  
+
   if (!apiKey) {
     console.warn("No API Key provided. Using mock data.");
     const chartData = generateTideCurve(MOCK_TIDE_DATA.tides);
@@ -59,7 +61,7 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
         tools: [{ googleSearch: {} }],
       },
     });
-    
+
     const rawText = searchResponse.text;
 
     // Step 2: Extract structured data from the search result
@@ -110,13 +112,13 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
                 properties: {
                   time: { type: Type.STRING },
                   height: { type: Type.NUMBER },
-                  type: { type: Type.STRING, enum: ["HIGH", "LOW"] }
-                }
-              }
-            }
-          }
-        }
-      }
+                  type: { type: Type.STRING, enum: ["HIGH", "LOW"] },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     const jsonString = extractionResponse.text;
@@ -126,7 +128,7 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
 
     // Validate and Process
     const tides: TideEvent[] = parsedData.tides || [];
-    
+
     if (tides.length === 0) throw new Error("No tide data found");
 
     const { height: currentHeight, isRising } = calculateCurrentHeight(tides);
@@ -135,22 +137,29 @@ export const fetchTideData = async (locationQuery: string): Promise<TideData> =>
     return {
       requestedName: locationQuery,
       locationName: parsedData.locationName || locationQuery,
-      coordinates: (parsedData.latitude && parsedData.longitude) ? { lat: parsedData.latitude, lng: parsedData.longitude } : undefined,
-      date: parsedData.date || new Date().toLocaleDateString('es-ES'),
+      coordinates:
+        parsedData.latitude && parsedData.longitude
+          ? { lat: parsedData.latitude, lng: parsedData.longitude }
+          : undefined,
+      date: parsedData.date || new Date().toLocaleDateString("es-ES"),
       coefficient: parsedData.coefficient || 70,
       sun: {
         sunrise: parsedData.sunrise || "07:00",
-        sunset: parsedData.sunset || "20:00"
+        sunset: parsedData.sunset || "20:00",
       },
       tides: tides.sort((a, b) => a.time.localeCompare(b.time)),
       currentHeight,
       isRising,
-      chartData
+      chartData,
     };
-
   } catch (error) {
     console.error("Error fetching tide data:", error);
     const chartData = generateTideCurve(MOCK_TIDE_DATA.tides as TideEvent[]);
-    return { ...MOCK_TIDE_DATA, requestedName: locationQuery, locationName: `${locationQuery} (Offline/Simulado)`, chartData } as TideData;
+    return {
+      ...MOCK_TIDE_DATA,
+      requestedName: locationQuery,
+      locationName: `${locationQuery} (Offline/Simulado)`,
+      chartData,
+    } as TideData;
   }
 };

@@ -20,6 +20,7 @@ Aplicación web para consultar predicciones de mareas usando APIs públicas y ba
 La aplicación utiliza las siguientes fuentes de datos, priorizando fuentes oficiales españolas:
 
 ### Fuentes Oficiales Españolas (Prioridad Alta)
+
 - **Tablademareas.com**: Datos oficiales del Instituto Hidrográfico de la Marina (IHM)
   - Acceso mediante scraping con proxy CORS
   - Cubre los principales puertos españoles
@@ -30,10 +31,12 @@ La aplicación utiliza las siguientes fuentes de datos, priorizando fuentes ofic
   - Incluye más de 30 puertos españoles principales
 
 ### APIs Públicas de Soporte
+
 - **Nominatim (OpenStreetMap)**: Geocodificación gratuita para convertir nombres de lugares a coordenadas
 - **Sunrise-Sunset API**: Datos de salida y puesta del sol
 
 ### Fallback
+
 - **Cálculo astronómico**: Fórmulas de marea cuando no hay datos disponibles del IHM
   - Solo se usa como último recurso si no se pueden obtener datos oficiales
 
@@ -42,6 +45,7 @@ La aplicación utiliza las siguientes fuentes de datos, priorizando fuentes ofic
 **Prerrequisitos:** Node.js
 
 1. Instalar dependencias:
+
    ```bash
    npm install
    ```
@@ -49,6 +53,7 @@ La aplicación utiliza las siguientes fuentes de datos, priorizando fuentes ofic
 2. No se requieren API keys - la aplicación usa datos públicos del IHM
 
 3. Ejecutar la aplicación:
+
    ```bash
    npm run dev
    ```

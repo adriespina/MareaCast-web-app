@@ -1,8 +1,7 @@
-
 export interface TideEvent {
   time: string; // HH:MM
   height: number; // meters
-  type: 'HIGH' | 'LOW';
+  type: "HIGH" | "LOW";
 }
 
 export interface SunCycle {
@@ -17,6 +16,10 @@ export interface TideData {
   coordinates?: { lat: number; lng: number };
   referenceCoordinates?: { lat: number; lng: number };
   requestedCoordinates?: { lat: number; lng: number };
+  dataSource?: string;
+  dataDisclaimer?: string;
+  sourceError?: string;
+  isApproximate?: boolean;
   date: string;
   currentHeight: number;
   isRising: boolean;
