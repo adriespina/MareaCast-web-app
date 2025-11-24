@@ -115,20 +115,30 @@ const App: React.FC = () => {
       onContextMenu={handleContextMenu}
     >
       {/* Top Bar */}
-      <Header 
-        locationName={data?.locationName || location} 
-        date={data?.date || ""} 
+      <Header
+        locationName={data?.locationName || location}
+        requestedName={data?.requestedName || location}
+        referenceLocationName={data?.referenceLocationName}
+        date={data?.date || ""}
         onSearch={handleSearch}
         onLocate={handleLocate}
         isLoading={loading}
       />
 
+      {data?.dataDisclaimer && (
+        <div className="bg-amber-900/60 text-amber-100 text-sm px-4 py-2 border-b border-amber-700 text-center">
+          <strong className="mr-1">Aviso:</strong> {data.dataDisclaimer}
+          {data.sourceError && <span className="ml-1 text-amber-200/80">({data.sourceError})</span>}
+        </div>
+      )}
+
       <main className="flex-1 flex flex-col max-w-5xl mx-auto w-full shadow-2xl bg-ocean-800 overflow-hidden md:my-8 md:rounded-xl border border-ocean-700">
         
         {/* Top Map Strip */}
-        <MapView 
-          locationName={data?.locationName || location} 
+        <MapView
+          locationName={data?.locationName || location}
           coordinates={data?.coordinates}
+          requestedName={data?.requestedName}
         />
 
         {/* Main Content Area - Split View */}
